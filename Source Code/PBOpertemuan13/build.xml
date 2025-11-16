@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="PenjualanPerangkat" default="run" basedir=".">
+
+    <property name="src.dir" value="src"/>
+    <property name="build.dir" value="build"/>
+    <property name="dist.dir" value="dist"/>
+    <property name="lib.dir" value="lib"/>
+    <property name="main.class" value="Dialogue.PenjualanPerangkatElektronik"/>
+    
+    <property name="resources.dir" value="src/META-INF"/>
+    
+    <path id="classpath">
+        <fileset dir="${lib.dir}" includes="**/*.jar"/>
+        <pathelement location="${build.dir}"/>
+    </path>
+    
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+        <delete dir="${dist.dir}"/>
+    </target>
+    
+    <target name="init" depends="clean">
+        <mkdir dir="${build.dir}"/>
+        <mkdir dir="${build.dir}/META-INF"/>
+    </target>
+    
+    <target name="compile" depends="init">
+        <!-- Copy persistence.xml ke build directory -->
+        <copy file="${resources.dir}/persistence.xml" todir="${build.dir}/META-INF" overwrite="true"/>
+        
+        <javac srcdir="${src.dir}" destdir="${build.dir}" includeantruntime="false" debug="true" debuglevel="lines,vars,source">
+            <classpath refid="classpath"/>
+        </javac>
+        <echo message="✅ Compile Java success!"/>
+    </target>
+    
+    <target name="jar" depends="compile">
+        <mkdir dir="${dist.dir}"/>
+        <jar destfile="${dist.dir}/PenjualanPerangkat.jar" basedir="${build.dir}">
+            <manifest>
+                <attribute name="Main-Class" value="${main.class}"/>
+                <attribute name="Class-Path" value="
+                    lib/jasperreports-6.20.0.jar 
+                    lib/commons-collections4-4.4.jar 
+                    lib/commons-beanutils-1.9.4.jar 
+                    lib/commons-collections-3.2.2.jar 
+                    lib/commons-digester-2.1.jar 
+                    lib/commons-logging-1.2.jar 
+                    lib/postgresql-42.6.0.jar
+                    lib/eclipselink-2.7.13.jar
+                    lib/javax.persistence-2.2.1.jar
+                "/>
+            </manifest>
+        </jar>
+        <echo message="✅ JAR created: ${dist.dir}/PenjualanPerangkat.jar"/>
+    </target>
+    
+    <target name="run" depends="jar">
+        <java jar="${dist.dir}/PenjualanPerangkat.jar" fork="true">
+            <classpath>
+                <path refid="classpath"/>
+                <path location="${dist.dir}/PenjualanPerangkat.jar"/>
+            </classpath>
+        </java>
+    </target>
+    
+    <target name="compile-report" depends="compile">
+        <java classname="Dialogue.CompileJRXML" fork="true">
+            <classpath>
+                <path refid="classpath"/>
+                <path location="${build.dir}"/>
+            </classpath>
+        </java>
+    </target>
+    
+    <target name="create-db-tables">
+        <sql driver="org.postgresql.Driver"
+             url="jdbc:postgresql://localhost:5432/PBO_Praktikum_5"
+             userid="postgres"
+             password="0000"
+             classpathref="classpath"
+             onerror="continue">
+            CREATE TABLE IF NOT EXISTS perangkat_elektronik (
+                nomor_seri VARCHAR(50) PRIMARY KEY,
+                jenis_perangkat VARCHAR(100) NOT NULL,
+                merek_perangkat VARCHAR(100) NOT NULL,
+                nama_perangkat VARCHAR(100) NOT NULL,
+                model_perangkat VARCHAR(100)
+            );
+            
+            CREATE TABLE IF NOT EXISTS detail_perangkat (
+                id_detail SERIAL PRIMARY KEY,
+                nomor_seri VARCHAR(50) NOT NULL,
+                warna VARCHAR(50) NOT NULL,
+                harga BIGINT NOT NULL,
+                stok INTEGER NOT NULL,
+                FOREIGN KEY (nomor_seri) REFERENCES perangkat_elektronik(nomor_seri) ON DELETE CASCADE
+            );
+            
+            INSERT INTO perangkat_elektronik (nomor_seri, jenis_perangkat, merek_perangkat, nama_perangkat, model_perangkat) 
+            VALUES 
+            ('SN001', 'Laptop', 'ASUS', 'Vivobook', 'X515EA'),
+            ('SN002', 'Smartphone', 'Samsung', 'Galaxy', 'S23'),
+            ('SN003', 'Tablet', 'Apple', 'iPad', '10th Gen')
+            ON CONFLICT (nomor_seri) DO NOTHING;
+            
+            INSERT INTO detail_perangkat (nomor_seri, warna, harga, stok) 
+            VALUES 
+            ('SN001', 'Silver', 8000000, 10),
+            ('SN002', 'Black', 12000000, 5),
+            ('SN003', 'Space Gray', 6000000, 8)
+            ON CONFLICT (id_detail) DO NOTHING;
+        </sql>
+        <echo message=" Database tables created successfully!"/>
+    </target>
+    
+    <target name="build-all" depends="jar, create-db-tables">
+        <echo message=" Build completed! Database tables created. Run with: ant run"/>
+    </target>
+    
+    <target name="test-entities">
+        <java classname="Dialogue.TestEntities" fork="true">
+            <classpath>
+                <path refid="classpath"/>
+                <path location="${build.dir}"/>
+            </classpath>
+        </java>
+    </target>
+
+</project>
